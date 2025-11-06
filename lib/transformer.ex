@@ -1,6 +1,5 @@
 defmodule AshCascadeArchival.Transformer do
   use Spark.Dsl.Transformer
-  require Logger
 
   alias Spark.Dsl.Transformer
   alias Ash.Resource.Relationships.{BelongsTo, HasMany, HasOne, ManyToMany}
@@ -14,7 +13,7 @@ defmodule AshCascadeArchival.Transformer do
 
   @impl Spark.Dsl.Transformer
   def transform(dsl_state) do
-    if Transformer.get_option(dsl_state, [:archive], :archive_related) == [] do
+    if AshArchival.Resource.Info.archive_archive_related!(dsl_state) == [] do
       do_transform(dsl_state)
     else
       {:ok, dsl_state}
@@ -22,12 +21,12 @@ defmodule AshCascadeArchival.Transformer do
   end
 
   defp do_transform(dsl_state) do
-    resource = dsl_state |> Transformer.get_persisted(:module)
-    except_list = Transformer.get_option(dsl_state, [:cascade_archive], :except, [])
+    resource = Transformer.get_persisted(dsl_state, :module)
+    excluded_names = AshCascadeArchival.Info.cascade_archive_except!(dsl_state)
 
-    descendants =
+    child_relationships =
       dsl_state
-      |> Transformer.get_entities([:relationships])
+      |> Ash.Resource.Info.relationships()
       |> Enum.filter(fn
         %BelongsTo{} -> false
         %HasMany{no_attributes?: no_attr?, manual: manual} -> not no_attr? and manual == nil
@@ -35,8 +34,8 @@ defmodule AshCascadeArchival.Transformer do
         %ManyToMany{} -> true
       end)
 
-    direct_partitions =
-      descendants
+    simple_children =
+      child_relationships
       |> Enum.filter(fn
         %HasMany{filter: filter, filters: filters} ->
           filter == nil and filters == []
@@ -47,87 +46,89 @@ defmodule AshCascadeArchival.Transformer do
         %ManyToMany{} ->
           false
       end)
-      |> tap(fn direct_partitions ->
-        redundant_descendants = descendants -- direct_partitions
+      |> tap(fn simple_children ->
+        redundant_children = child_relationships -- simple_children
 
-        warn_redundant_descendants_not_belong_to_any_direct_partition(
-          redundant_descendants,
-          direct_partitions,
+        suggest_missing_simple_children(
+          redundant_children,
+          simple_children,
           resource
         )
 
-        validate_except!(except_list, direct_partitions, resource)
+        validate_except!(excluded_names, simple_children)
       end)
+
+    archive_related =
+      simple_children
+      |> Enum.reject(&(&1.name in excluded_names))
+      |> Enum.map(& &1.name)
 
     {:ok,
      dsl_state
      |> Transformer.set_option(
        [:archive],
        :archive_related,
-       direct_partitions |> Enum.reject(&(&1.name in except_list)) |> Enum.map(& &1.name)
+       archive_related
      )}
   end
 
-  @common_explain """
+  @simple_child_explanation """
   A simple child is when no_attributes? and manual are nil, and it's either:
   1. A has_many relationship with filters == [].
   2. A has_one relationship with from_many? == false.
   """
 
-  defp validate_except!(except_list, direct_partitions, resource) do
-    direct_partition_names = direct_partitions |> Enum.map(& &1.name)
+  defp validate_except!(excluded_names, simple_children) do
+    simple_children_names = simple_children |> Enum.map(& &1.name)
 
-    except_list
-    |> Enum.each(fn except ->
-      unless except in direct_partition_names do
+    excluded_names
+    |> Enum.each(fn excluded ->
+      unless excluded in simple_children_names do
         raise """
-        #{inspect(except)} specified in `except` is not a simple child of #{resource |> inspect()} and therefore cannot be a target for ash_archival's archive_related. Thus, it cannot be specified in `except`.
-        #{@common_explain}
+        #{inspect(excluded)} specified in `except` is not a simple child. Only simple children can be archived.
+        #{@simple_child_explanation}
         """
       end
     end)
   end
 
-  defp warn_redundant_descendants_not_belong_to_any_direct_partition(
-         redundant_descendants,
-         direct_partitions,
+  defp suggest_missing_simple_children(
+         redundant_children,
+         simple_children,
          resource
        ) do
-    direct_partition_dests = direct_partitions |> Enum.map(& &1.destination)
+    archivable_dests = simple_children |> Enum.map(& &1.destination)
 
-    warn_message = fn dest ->
+    missing_children_hint = fn destination ->
       """
-      Please explicitly create a simple has_many relationship with destination #{dest |> inspect()} so that cascade_archive can process it.
-      #{@common_explain}
+      Create a simple has_many relationship to #{inspect(destination)} so cascade_archive can process it.
+      #{@simple_child_explanation}
       """
     end
 
-    redundant_descendants
+    redundant_children
     |> Enum.each(fn
-      %HasMany{name: name, destination: dest} ->
-        unless dest in direct_partition_dests do
-          Logger.warning("""
-
-          #{resource |> inspect()}.#{name} is not a simple has_many and therefore cannot be a target for ash_archival's archive_related.
-          #{warn_message.(dest)}
+      %HasMany{name: name, destination: destination} ->
+        unless destination in archivable_dests do
+          IO.warn("""
+          #{inspect(resource)}.#{name} is not a simple has_many. It cannot be archived.
+          #{missing_children_hint.(destination)}
           """)
         end
 
-      %HasOne{name: name, destination: dest} ->
-        unless dest in direct_partition_dests do
-          Logger.warning("""
-
-          #{resource |> inspect()}.#{name} is not a simple has_one and therefore cannot be a target for ash_archival's archive_related.
-          #{warn_message.(dest)}
+      %HasOne{name: name, destination: destination} ->
+        unless destination in archivable_dests do
+          IO.warn("""
+          #{inspect(resource)}.#{name} is not a simple has_one. It cannot be archived.
+          #{missing_children_hint.(destination)}
           """)
         end
 
       %ManyToMany{name: name, through: through} ->
-        unless through in direct_partition_dests do
-          Logger.warning("""
-
-          #{resource |> inspect()}.#{name} is a many_to_many relationship and therefore cannot be a target for ash_archival's archive_related.
-          #{warn_message.(through)}
+        unless through in archivable_dests do
+          IO.warn("""
+          #{inspect(resource)}.#{name} is a many_to_many relationship. It cannot be archived.
+          #{missing_children_hint.(through)}
           """)
         end
     end)
