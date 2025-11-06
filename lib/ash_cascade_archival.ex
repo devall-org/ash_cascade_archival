@@ -25,5 +25,6 @@ defmodule AshCascadeArchival do
   use Spark.Dsl.Extension,
     sections: [@cascade_archive],
     add_extensions: [AshArchival.Resource],
-    transformers: [AshCascadeArchival.Transformer]
+    transformers: [AshCascadeArchival.Transformer],
+    verifiers: [AshCascadeArchival.Verifier]
 end
