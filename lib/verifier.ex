@@ -8,12 +8,11 @@ defmodule AshCascadeArchival.Verifier do
   @impl true
   def verify(dsl_state) do
     current = dsl_state |> Verifier.get_persisted(:module)
-    # Ash.Resource.Info.multitenancy_attribute(dsl_state)
-    multitenant_attr = dsl_state |> Verifier.get_option([:multitenancy], :attribute)
+    multitenant_attr = Ash.Resource.Info.multitenancy_attribute(dsl_state)
 
     belongs_toes =
       dsl_state
-      |> Verifier.get_entities([:relationships])
+      |> Ash.Resource.Info.relationships()
       |> Enum.filter(fn
         %BelongsTo{source_attribute: source_attribute} ->
           source_attribute != multitenant_attr
@@ -27,7 +26,7 @@ defmodule AshCascadeArchival.Verifier do
       perant_dsl = destination.spark_dsl_config()
 
       perant_dsl
-      |> Verifier.get_entities([:relationships])
+      |> Ash.Resource.Info.relationships()
       |> Enum.any?(fn rel ->
         case rel do
           %HasOne{destination: ^current} -> true
@@ -46,8 +45,8 @@ defmodule AshCascadeArchival.Verifier do
 
         Logger.warning("""
 
-        AshArchival이 제대로 동작하기 위해서는 belongs_to <-> has_many, has_one, many_to_many 쌍이 맞아야 합니다.
-        #{parent}.ex에 아래 중 한줄을 추가하세요.
+        AshArchival requires has_many, has_one, or many_to_many to pair with belongs_to.
+        Add one of the following to #{parent}.ex:
 
         has_many :#{children}, R.#{child_resource}
         has_one :#{child}, R.#{child_resource}
