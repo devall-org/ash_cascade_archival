@@ -1,11 +1,15 @@
 defmodule AshCascadeArchival.Transformer do
   use Spark.Dsl.Transformer
 
+  require Logger
   alias Spark.Dsl.Transformer
-  alias Ash.Resource.Relationships.{BelongsTo, HasMany, HasOne, ManyToMany}
+  alias AshCascadeArchival.Helpers
+
+  @setup_archival_module AshArchival.Resource.Transformers.SetupArchival
+  Code.ensure_loaded!(@setup_archival_module)
 
   @impl Spark.Dsl.Transformer
-  def before?(AshArchival.Resource.Transformers.SetupArchival), do: true
+  def before?(@setup_archival_module), do: true
   def before?(_), do: false
 
   @impl Spark.Dsl.Transformer
@@ -13,55 +17,53 @@ defmodule AshCascadeArchival.Transformer do
 
   @impl Spark.Dsl.Transformer
   def transform(dsl_state) do
-    if AshArchival.Resource.Info.archive_archive_related!(dsl_state) == [] do
-      do_transform(dsl_state)
-    else
-      {:ok, dsl_state}
+    archive_related = AshArchival.Resource.Info.archive_archive_related!(dsl_state)
+
+    case archive_related do
+      [] ->
+        do_transform(dsl_state)
+
+      _ ->
+        resource = Transformer.get_persisted(dsl_state, :module)
+
+        {:error,
+         """
+         #{inspect(resource)} cannot use both `cascade_archive` and explicit `archive_related`.
+
+         `cascade_archive` automatically sets `archive_related` based on relationships.
+         To exclude specific relationships, use the `except` option in `cascade_archive`:
+
+           cascade_archive do
+             except [:relationship_name]
+           end
+
+         Current archive_related: #{inspect(archive_related)}
+         """}
     end
   end
 
   defp do_transform(dsl_state) do
     resource = Transformer.get_persisted(dsl_state, :module)
-    excluded_names = AshCascadeArchival.Info.cascade_archive_except!(dsl_state)
+    except = AshCascadeArchival.Info.cascade_archive_except!(dsl_state)
 
-    child_relationships =
+    # Find all fully-contained child relationships
+    fully_contained_children =
       dsl_state
       |> Ash.Resource.Info.relationships()
-      |> Enum.filter(fn
-        %BelongsTo{} -> false
-        %HasMany{no_attributes?: no_attr?, manual: manual} -> not no_attr? and manual == nil
-        %HasOne{no_attributes?: no_attr?, manual: manual} -> not no_attr? and manual == nil
-        %ManyToMany{} -> true
-      end)
+      |> Enum.filter(&Helpers.fully_contained_child?/1)
 
-    simple_children =
-      child_relationships
-      |> Enum.filter(fn
-        %HasMany{filter: filter, filters: filters} ->
-          filter == nil and filters == []
-
-        %HasOne{from_many?: from_many?, filter: _filter, filters: _filters} ->
-          not from_many?
-
-        %ManyToMany{} ->
-          false
-      end)
-      |> tap(fn simple_children ->
-        redundant_children = child_relationships -- simple_children
-
-        suggest_missing_simple_children(
-          redundant_children,
-          simple_children,
-          resource
-        )
-
-        validate_except!(excluded_names, simple_children)
-      end)
+    validate_except!(except, fully_contained_children)
 
     archive_related =
-      simple_children
-      |> Enum.reject(&(&1.name in excluded_names))
+      fully_contained_children
+      |> Enum.reject(&(&1.name in except))
       |> Enum.map(& &1.name)
+
+    unless Enum.empty?(archive_related) do
+      Logger.info(
+        "[AshCascadeArchival] #{inspect(resource)} archive_related: #{inspect(archive_related)}"
+      )
+    end
 
     {:ok,
      dsl_state
@@ -72,65 +74,22 @@ defmodule AshCascadeArchival.Transformer do
      )}
   end
 
-  @simple_child_explanation """
-  A simple child is when no_attributes? and manual are nil, and it's either:
-  1. A has_many relationship with filters == [].
-  2. A has_one relationship with from_many? == false.
-  """
+  defp validate_except!(except, fully_contained_children) do
+    valid_names = Enum.map(fully_contained_children, & &1.name)
 
-  defp validate_except!(excluded_names, simple_children) do
-    simple_children_names = simple_children |> Enum.map(& &1.name)
-
-    excluded_names
-    |> Enum.each(fn excluded ->
-      unless excluded in simple_children_names do
+    Enum.each(except, fn name ->
+      unless name in valid_names do
         raise """
-        #{inspect(excluded)} specified in `except` is not a simple child. Only simple children can be archived.
-        #{@simple_child_explanation}
+        #{inspect(name)} specified in `except` is not a fully-contained child relationship.
+
+        Only fully-contained relationships can be archived:
+        - has_one with no_attributes?: false, manual: nil, filters: []
+        - has_many with no_attributes?: false, manual: nil, filters: []
+        - many_to_many with filters: []
+
+        Available relationships: #{inspect(valid_names)}
         """
       end
-    end)
-  end
-
-  defp suggest_missing_simple_children(
-         redundant_children,
-         simple_children,
-         resource
-       ) do
-    archivable_dests = simple_children |> Enum.map(& &1.destination)
-
-    missing_children_hint = fn destination ->
-      """
-      Create a simple has_many relationship to #{inspect(destination)} so cascade_archive can process it.
-      #{@simple_child_explanation}
-      """
-    end
-
-    redundant_children
-    |> Enum.each(fn
-      %HasMany{name: name, destination: destination} ->
-        unless destination in archivable_dests do
-          IO.warn("""
-          #{inspect(resource)}.#{name} is not a simple has_many. It cannot be archived.
-          #{missing_children_hint.(destination)}
-          """)
-        end
-
-      %HasOne{name: name, destination: destination} ->
-        unless destination in archivable_dests do
-          IO.warn("""
-          #{inspect(resource)}.#{name} is not a simple has_one. It cannot be archived.
-          #{missing_children_hint.(destination)}
-          """)
-        end
-
-      %ManyToMany{name: name, through: through} ->
-        unless through in archivable_dests do
-          IO.warn("""
-          #{inspect(resource)}.#{name} is a many_to_many relationship. It cannot be archived.
-          #{missing_children_hint.(through)}
-          """)
-        end
     end)
   end
 end

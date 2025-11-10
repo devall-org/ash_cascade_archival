@@ -2,7 +2,7 @@
 
 ## Purpose
 
-AshCascadeArchival automatically sets `archive_related` from `ash_archival` for all `has_many`, `has_one`, and `many_to_many` relationships. When a resource is archived, related records are also archived.
+AshCascadeArchival automatically sets `archive_related` from `ash_archival` for all fully-contained child relationships (`has_many`, `has_one`, and `many_to_many`). When a resource is archived, related records are also archived.
 
 ## Usage
 
@@ -24,9 +24,9 @@ end
 
 This automatically sets `archive_related [:comments, :post_tags]`.
 
-## Simple Child Relationships
+## Fully-Contained Child Relationships
 
-AshCascadeArchival only processes "simple child" relationships:
+AshCascadeArchival only processes "fully-contained" child relationships:
 
 **has_many conditions:**
 - `no_attributes?: false` (default)
@@ -36,10 +36,11 @@ AshCascadeArchival only processes "simple child" relationships:
 **has_one conditions:**
 - `no_attributes?: false` (default)
 - `manual: nil` (default)
-- `from_many?: false` (default)
+- `filters: []` (no filters)
 
 **many_to_many:**
-- The through resource is automatically handled as a simple has_many
+- `filters: []` (no filters)
+- The through resource is automatically handled
 
 ## Excluding Relationships
 
@@ -61,12 +62,66 @@ defmodule MyApp.Post do
 end
 ```
 
+## Validation
+
+AshCascadeArchival verifies bidirectional relationships. If a child has a `belongs_to` to an archival parent, the parent must have a corresponding fully-contained relationship back to the child.
+
+**Example:**
+
+```elixir
+# Child resource
+defmodule MyApp.Comment do
+  use Ash.Resource,
+    extensions: [AshCascadeArchival]
+
+  relationships do
+    belongs_to :post, MyApp.Post  # Parent must have reverse relationship
+  end
+end
+
+# Parent resource - MUST have one of these:
+defmodule MyApp.Post do
+  use Ash.Resource,
+    extensions: [AshArchival.Resource]
+
+  relationships do
+    has_many :comments, MyApp.Comment  # ✓ Valid
+    # OR
+    has_one :comment, MyApp.Comment    # ✓ Valid
+    # OR
+    many_to_many :items, Item, through: MyApp.Comment  # ✓ Valid
+  end
+end
+```
+
+If the parent doesn't have a proper reverse relationship, you'll get a compile-time error.
+
+## Conflict with Manual Configuration
+
+You **cannot** use both `cascade_archive` and manually set `archive_related`. This will raise an error:
+
+```elixir
+defmodule MyApp.Post do
+  use Ash.Resource,
+    extensions: [AshCascadeArchival]
+
+  cascade_archive do
+    # Using cascade_archive
+  end
+
+  archive do
+    archive_related [:comments]  # ✗ Error: Cannot use both!
+  end
+end
+```
+
+**Solution:** Choose one approach:
+- Use `cascade_archive` with `except` option for automatic configuration
+- Remove `AshCascadeArchival` extension and manually set `archive_related`
+
 ## Complex Relationships
 
-Filtered has_many or from_many? has_one relationships are not automatically processed. In these cases:
-
-1. Define a separate simple child relationship, or
-2. Manually set `archive_related` in `ash_archival`
+Filtered relationships are not automatically processed:
 
 ```elixir
 relationships do
@@ -75,18 +130,22 @@ relationships do
     filter expr(status == :published)
   end
 
-  # Simple relationship - this will be automatically processed
+  # Simple relationship - automatically processed
   has_many :posts, Post
 end
 ```
 
-## Manual Override
+For complex relationships:
+1. Define a separate simple child relationship for archival
+2. Use `except` to exclude the complex relationship if needed
 
-If `archive_related` is already manually set, AshCascadeArchival does nothing:
+## How It Works
 
-```elixir
-archive do
-  archive_related [:custom_list]  # Already set, will be ignored
-end
-```
+1. **Transformer**: Scans all relationships, finds fully-contained children, and sets `archive_related`
+2. **Verifier**: Validates bidirectional relationships for archival consistency
 
+## Best Practices
+
+- Use `cascade_archive` for most resources with standard relationships
+- Use `except` to exclude specific relationships (e.g., audit logs, complex filtered relationships)
+- Define separate simple relationships for archival when you have complex filtered relationships

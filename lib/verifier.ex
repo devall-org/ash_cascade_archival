@@ -1,16 +1,16 @@
 defmodule AshCascadeArchival.Verifier do
   use Spark.Dsl.Verifier
 
-  require Logger
   alias Spark.Dsl.Verifier
-  alias Ash.Resource.Relationships.{BelongsTo, ManyToMany, HasOne, HasMany}
+  alias Ash.Resource.Relationships.BelongsTo
+  alias AshCascadeArchival.Helpers
 
   @impl true
   def verify(dsl_state) do
-    current = dsl_state |> Verifier.get_persisted(:module)
+    child_module = dsl_state |> Verifier.get_persisted(:module)
     multitenant_attr = Ash.Resource.Info.multitenancy_attribute(dsl_state)
 
-    belongs_toes =
+    belongs_to_rels =
       dsl_state
       |> Ash.Resource.Info.relationships()
       |> Enum.filter(fn
@@ -21,44 +21,64 @@ defmodule AshCascadeArchival.Verifier do
           false
       end)
 
-    belongs_toes
-    |> Enum.each(fn %BelongsTo{destination: destination} ->
-      perant_dsl = destination.spark_dsl_config()
-
-      perant_dsl
-      |> Ash.Resource.Info.relationships()
-      |> Enum.any?(fn rel ->
-        case rel do
-          %HasOne{destination: ^current} -> true
-          %HasMany{destination: ^current} -> true
-          %ManyToMany{through: ^current} -> true
-          _ -> false
-        end
+    errors =
+      belongs_to_rels
+      |> Enum.reduce([], fn %BelongsTo{destination: parent_module}, errors ->
+        validate_archival_relationship(parent_module, child_module) ++ errors
       end)
-      |> unless do
-        parent_resource = destination |> printable()
-        parent = parent_resource |> Macro.underscore()
 
-        child_resource = current |> printable()
-        child = child_resource |> Macro.underscore()
-        children = "#{child}s"
+    case errors do
+      [] ->
+        :ok
 
-        Logger.warning("""
-
-        AshArchival requires has_many, has_one, or many_to_many to pair with belongs_to.
-        Add one of the following to #{parent}.ex:
-
-        has_many :#{children}, R.#{child_resource}
-        has_one :#{child}, R.#{child_resource}
-        many_to_many :<things>, <R.Thing>, through: R.#{child_resource}
-        """)
-      end
-    end)
-
-    :ok
+      _ ->
+        {:error, Enum.join(errors, "\n\n")}
+    end
   end
 
-  defp printable(module) do
-    module |> Module.split() |> List.last()
+  defp validate_archival_relationship(parent_module, child_module) do
+    extensions = Spark.Dsl.Extension.get_persisted(parent_module, :extensions)
+
+    # If the parent is not an AshArchival target, skip validation
+    if AshArchival.Resource not in extensions do
+      []
+    else
+      # If the parent is an AshArchival target, verify it has a fully-contained relationship to child
+      if has_fully_contained_child?(parent_module, child_module) do
+        []
+      else
+        [build_error_message(parent_module, child_module)]
+      end
+    end
+  end
+
+  defp has_fully_contained_child?(parent_module, child_module) do
+    parent_module
+    |> Ash.Resource.Info.relationships()
+    |> Enum.any?(fn rel ->
+      Helpers.child_relationship_to_module?(rel, child_module) and
+        Helpers.fully_contained_child?(rel)
+    end)
+  end
+
+  defp build_error_message(parent_module, child_module) do
+    child_singular = to_singular(child_module)
+    child_plural = Inflex.pluralize(child_singular)
+
+    """
+    AshArchival requires has_many, has_one, or many_to_many to pair with belongs_to.
+    Parent #{inspect(parent_module)} must have one of the following:
+
+    has_many :#{child_plural}, #{inspect(child_module)}
+    has_one :#{child_singular}, #{inspect(child_module)}
+    many_to_many :<relationship_name>, <RelatedResource>, through: #{inspect(child_module)}
+    """
+  end
+
+  defp to_singular(module) do
+    module
+    |> Module.split()
+    |> List.last()
+    |> Macro.underscore()
   end
 end
