@@ -2,7 +2,7 @@
 
 ## Purpose
 
-AshCascadeArchival automatically sets `archive_related` from `ash_archival` for all fully-contained child relationships (`has_many`, `has_one`, and `many_to_many`). When a resource is archived, related records are also archived.
+AshCascadeArchival automatically sets `archive_related` from `ash_archival` for all fully-contained child relationships (`has_many` and `has_one`). When a resource is archived, related records are also archived.
 
 ## Usage
 
@@ -38,9 +38,9 @@ AshCascadeArchival only processes "fully-contained" child relationships:
 - `manual: nil` (default)
 - `filters: []` (no filters)
 
-**many_to_many:**
-- `filters: []` (no filters)
-- The through resource is automatically handled
+**many_to_many is excluded:**
+- `archive_related` would target the destination resource, not the through resource
+- Instead, define a `has_many` relationship to the through resource to archive it
 
 ## Excluding Relationships
 

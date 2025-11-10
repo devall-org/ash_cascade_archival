@@ -66,12 +66,11 @@ defmodule AshCascadeArchival.Verifier do
     child_plural = Inflex.pluralize(child_singular)
 
     """
-    AshArchival requires has_many, has_one, or many_to_many to pair with belongs_to.
+    AshArchival requires has_many or has_one to pair with belongs_to.
     Parent #{inspect(parent_module)} must have one of the following:
 
     has_many :#{child_plural}, #{inspect(child_module)}
     has_one :#{child_singular}, #{inspect(child_module)}
-    many_to_many :<relationship_name>, <RelatedResource>, through: #{inspect(child_module)}
     """
   end
 

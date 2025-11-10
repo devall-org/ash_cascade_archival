@@ -85,7 +85,6 @@ defmodule AshCascadeArchival.Transformer do
         Only fully-contained relationships can be archived:
         - has_one with no_attributes?: false, manual: nil, filters: []
         - has_many with no_attributes?: false, manual: nil, filters: []
-        - many_to_many with filters: []
 
         Available relationships: #{inspect(valid_names)}
         """

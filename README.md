@@ -1,6 +1,6 @@
 # AshCascadeArchival
 
-Automatically sets `archive_related` from `ash_archival` for all fully-contained child relationships (`has_many`, `has_one`, and `many_to_many`).
+Automatically sets `archive_related` from `ash_archival` for all fully-contained child relationships (`has_many` and `has_one`).
 
 ## Installation
 
@@ -59,7 +59,8 @@ end
 
 - **has_one**: `no_attributes?: false`, `manual: nil`, `filters: []`
 - **has_many**: `no_attributes?: false`, `manual: nil`, `filters: []`
-- **many_to_many**: `filters: []`
+
+**Note**: `many_to_many` relationships are excluded because `archive_related` would target the destination resource, not the through resource. Instead, define a `has_many` relationship to the through resource (e.g., `has_many :post_tags, PostTag`) to archive it.
 
 ### Excluding Relationships
 
@@ -96,12 +97,11 @@ end
 **Example error:**
 
 ```
-AshArchival requires has_many, has_one, or many_to_many to pair with belongs_to.
+AshArchival requires has_many or has_one to pair with belongs_to.
 Parent MyApp.Author must have one of the following:
 
 has_many :posts, MyApp.Post
 has_one :post, MyApp.Post
-many_to_many :<relationship_name>, <RelatedResource>, through: MyApp.Post
 ```
 
 ## How It Works

@@ -10,10 +10,10 @@ defmodule AshCascadeArchival.TransformerTest do
       assert Enum.sort(archive_related) == [:comments, :posts]
     end
 
-    test "Post has comments, post_tags, and tags in archive_related" do
+    test "Post has comments and post_tags in archive_related" do
       archive_related = AshArchival.Resource.Info.archive_archive_related!(TestResources.Post)
 
-      assert Enum.sort(archive_related) == [:comments, :post_tags, :tags]
+      assert Enum.sort(archive_related) == [:comments, :post_tags]
     end
 
     test "Comment has no child relationships in archive_related" do
@@ -28,10 +28,10 @@ defmodule AshCascadeArchival.TransformerTest do
       assert archive_related == []
     end
 
-    test "Tag has post_tags and posts in archive_related" do
+    test "Tag has post_tags in archive_related" do
       archive_related = AshArchival.Resource.Info.archive_archive_related!(TestResources.Tag)
 
-      assert Enum.sort(archive_related) == [:post_tags, :posts]
+      assert archive_related == [:post_tags]
     end
   end
 
