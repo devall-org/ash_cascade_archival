@@ -21,7 +21,7 @@ Simply add `AshCascadeArchival` to your resource's extensions:
 ```elixir
 defmodule MyApp.Post do
   use Ash.Resource,
-    extensions: [AshCascadeArchival]
+    extensions: [AshCascadeArchival.Resource]
 
   attributes do
     uuid_primary_key :id
@@ -68,7 +68,7 @@ Use the `except` option to exclude specific relationships:
 ```elixir
 defmodule MyApp.Post do
   use Ash.Resource,
-    extensions: [AshCascadeArchival]
+    extensions: [AshCascadeArchival.Resource]
 
   cascade_archive do
     except [:post_tags]
@@ -108,6 +108,19 @@ many_to_many :<relationship_name>, <RelatedResource>, through: MyApp.Post
 
 1. **Transformer**: Finds all fully-contained child relationships and sets `archive_related`
 2. **Verifier**: Ensures bidirectional relationships are properly configured for archival
+
+## Configuration
+
+### Logging
+
+By default, `AshCascadeArchival` logs the configured `archive_related` relationships during compilation. You can disable this in your config:
+
+```elixir
+# config/config.exs
+config :ash_cascade_archival, :log, false
+```
+
+Default: `true` (logging enabled)
 
 ## Conflict with Manual Configuration
 

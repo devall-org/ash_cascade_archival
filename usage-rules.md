@@ -12,7 +12,7 @@ Add the extension to your resource:
 defmodule MyApp.Post do
   use Ash.Resource,
     data_layer: AshPostgres.DataLayer,
-    extensions: [AshCascadeArchival]
+    extensions: [AshCascadeArchival.Resource]
 
   relationships do
     has_many :comments, Comment
@@ -49,7 +49,7 @@ Use the `except` option to exclude specific relationships:
 ```elixir
 defmodule MyApp.Post do
   use Ash.Resource,
-    extensions: [AshCascadeArchival]
+    extensions: [AshCascadeArchival.Resource]
 
   cascade_archive do
     except [:audit_logs]
@@ -72,7 +72,7 @@ AshCascadeArchival verifies bidirectional relationships. If a child has a `belon
 # Child resource
 defmodule MyApp.Comment do
   use Ash.Resource,
-    extensions: [AshCascadeArchival]
+    extensions: [AshCascadeArchival.Resource]
 
   relationships do
     belongs_to :post, MyApp.Post  # Parent must have reverse relationship
@@ -103,7 +103,7 @@ You **cannot** use both `cascade_archive` and manually set `archive_related`. Th
 ```elixir
 defmodule MyApp.Post do
   use Ash.Resource,
-    extensions: [AshCascadeArchival]
+    extensions: [AshCascadeArchival.Resource]
 
   cascade_archive do
     # Using cascade_archive

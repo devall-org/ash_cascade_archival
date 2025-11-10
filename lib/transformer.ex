@@ -59,7 +59,7 @@ defmodule AshCascadeArchival.Transformer do
       |> Enum.reject(&(&1.name in except))
       |> Enum.map(& &1.name)
 
-    unless Enum.empty?(archive_related) do
+    if log_enabled?() and not Enum.empty?(archive_related) do
       Logger.info(
         "[AshCascadeArchival] #{inspect(resource)} archive_related: #{inspect(archive_related)}"
       )
@@ -91,5 +91,9 @@ defmodule AshCascadeArchival.Transformer do
         """
       end
     end)
+  end
+
+  defp log_enabled? do
+    Application.get_env(:ash_cascade_archival, :log, true)
   end
 end

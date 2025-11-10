@@ -1,3 +1,3 @@
 defmodule AshCascadeArchival.Info do
-  use Spark.InfoGenerator, extension: AshCascadeArchival, sections: [:cascade_archive]
+  use Spark.InfoGenerator, extension: AshCascadeArchival.Resource, sections: [:cascade_archive]
 end
