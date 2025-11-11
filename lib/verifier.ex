@@ -8,17 +8,13 @@ defmodule AshCascadeArchival.Verifier do
   @impl true
   def verify(dsl_state) do
     child_module = dsl_state |> Verifier.get_persisted(:module)
-    multitenant_attr = Ash.Resource.Info.multitenancy_attribute(dsl_state)
 
     belongs_to_rels =
       dsl_state
       |> Ash.Resource.Info.relationships()
       |> Enum.filter(fn
-        %BelongsTo{source_attribute: source_attribute} ->
-          source_attribute != multitenant_attr
-
-        %{} ->
-          false
+        %BelongsTo{} -> true
+        %{} -> false
       end)
 
     errors =
