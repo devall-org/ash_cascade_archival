@@ -9,7 +9,7 @@ Add `ash_cascade_archival` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:ash_cascade_archival, "~> 0.4.0"}
+    {:ash_cascade_archival, "~> 0.4.1"}
   ]
 end
 ```
