@@ -9,7 +9,7 @@ Add `ash_cascade_archival` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:ash_cascade_archival, "~> 0.4.1"}
+    {:ash_cascade_archival, "~> 0.5.0"}
   ]
 end
 ```
@@ -90,6 +90,38 @@ archive do
 end
 ```
 
+### Including Only Specific Relationships
+
+Use the `only` option to include a specific set of relationships:
+
+```elixir
+defmodule MyApp.Post do
+  use Ash.Resource,
+    extensions: [AshCascadeArchival.Resource]
+
+  cascade_archive do
+    only [:comments]
+  end
+
+  relationships do
+    has_many :comments, MyApp.Comment
+    has_many :post_tags, MyApp.PostTag
+  end
+end
+```
+
+Result:
+
+```elixir
+archive do
+  archive_related [:comments]  # post_tags not included
+end
+```
+
+`only` and `except` cannot be used together.
+When neither option is set, all fully-contained child relationships are archived.
+Use `only []` to archive no relationships.
+
 ### Validation
 
 `AshCascadeArchival` verifies that parent resources with `AshArchival` have proper reverse relationships. If a child has a `belongs_to` to an archival parent, the parent must have a corresponding fully-contained relationship back to the child.
@@ -124,7 +156,13 @@ Default: `true` (logging enabled)
 
 ## Conflict with Manual Configuration
 
-You cannot use both `cascade_archive` and manually set `archive_related`. If you need to exclude specific relationships, use the `except` option in `cascade_archive`:
+You cannot use both `cascade_archive` and manually set `archive_related`. If you need to include or exclude specific relationships, use the `only` or `except` option in `cascade_archive`:
+
+```elixir
+cascade_archive do
+  only [:relationship_name]
+end
+```
 
 ```elixir
 cascade_archive do

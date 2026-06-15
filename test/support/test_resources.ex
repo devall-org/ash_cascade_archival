@@ -101,6 +101,52 @@ defmodule AshCascadeArchival.Test.Support.TestResources do
     end
   end
 
+  defmodule PostWithOnly do
+    @moduledoc false
+    use Ash.Resource, domain: nil, extensions: [AshCascadeArchival.Resource]
+
+    cascade_archive do
+      only [:comments]
+    end
+
+    attributes do
+      uuid_primary_key :id
+    end
+
+    relationships do
+      has_many :comments, TestResources.Comment do
+        destination_attribute :post_id
+      end
+
+      has_many :post_tags, TestResources.PostTag do
+        destination_attribute :post_id
+      end
+    end
+  end
+
+  defmodule PostWithEmptyOnly do
+    @moduledoc false
+    use Ash.Resource, domain: nil, extensions: [AshCascadeArchival.Resource]
+
+    cascade_archive do
+      only []
+    end
+
+    attributes do
+      uuid_primary_key :id
+    end
+
+    relationships do
+      has_many :comments, TestResources.Comment do
+        destination_attribute :post_id
+      end
+
+      has_many :post_tags, TestResources.PostTag do
+        destination_attribute :post_id
+      end
+    end
+  end
+
   defmodule PostWithFilteredRelationship do
     @moduledoc false
     use Ash.Resource, domain: nil, extensions: [AshCascadeArchival.Resource]

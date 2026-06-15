@@ -44,6 +44,22 @@ defmodule AshCascadeArchival.TransformerTest do
     end
   end
 
+  describe "only option" do
+    test "PostWithOnly includes only comments in archive_related" do
+      archive_related =
+        AshArchival.Resource.Info.archive_archive_related!(TestResources.PostWithOnly)
+
+      assert archive_related == [:comments]
+    end
+
+    test "PostWithEmptyOnly includes no relationships in archive_related" do
+      archive_related =
+        AshArchival.Resource.Info.archive_archive_related!(TestResources.PostWithEmptyOnly)
+
+      assert archive_related == []
+    end
+  end
+
   describe "filtered relationships" do
     test "PostWithFilteredRelationship only includes unfiltered comments" do
       archive_related =
