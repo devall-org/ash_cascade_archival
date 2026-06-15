@@ -31,7 +31,12 @@ defmodule AshCascadeArchival.Transformer do
          #{inspect(resource)} cannot use both `cascade_archive` and explicit `archive_related`.
 
          `cascade_archive` automatically sets `archive_related` based on relationships.
+         To select specific relationships, use the `only` option in `cascade_archive`.
          To exclude specific relationships, use the `except` option in `cascade_archive`:
+
+           cascade_archive do
+             only [:relationship_name]
+           end
 
            cascade_archive do
              except [:relationship_name]
@@ -45,6 +50,7 @@ defmodule AshCascadeArchival.Transformer do
   defp do_transform(dsl_state) do
     resource = Transformer.get_persisted(dsl_state, :module)
     except = AshCascadeArchival.Info.cascade_archive_except!(dsl_state)
+    only = fetch_only(dsl_state)
 
     # Find all fully-contained child relationships
     fully_contained_children =
@@ -52,11 +58,11 @@ defmodule AshCascadeArchival.Transformer do
       |> Ash.Resource.Info.relationships()
       |> Enum.filter(&Helpers.fully_contained_child?/1)
 
-    validate_except!(except, fully_contained_children)
+    validate_options!(only, except, fully_contained_children)
 
     archive_related =
       fully_contained_children
-      |> Enum.reject(&(&1.name in except))
+      |> filter_archive_related(only, except)
       |> Enum.map(& &1.name)
 
     if log_enabled?() and not Enum.empty?(archive_related) do
@@ -74,13 +80,48 @@ defmodule AshCascadeArchival.Transformer do
      )}
   end
 
-  defp validate_except!(except, fully_contained_children) do
+  defp fetch_only(dsl_state) do
+    case Transformer.fetch_option(dsl_state, [:cascade_archive], :only) do
+      {:ok, nil} -> :all
+      {:ok, only} -> {:only, only}
+      :error -> :all
+    end
+  end
+
+  defp filter_archive_related(relationships, :all, except) do
+    Enum.reject(relationships, &(&1.name in except))
+  end
+
+  defp filter_archive_related(relationships, {:only, only}, _except) do
+    Enum.filter(relationships, &(&1.name in only))
+  end
+
+  defp validate_options!(only, except, fully_contained_children) do
+    if only != :all and except != [] do
+      raise """
+      Cannot use both `only` and `except` in `cascade_archive`.
+
+      Use `only` to include a specific set of relationships, or `except` to exclude relationships from the automatic set.
+      """
+    end
+
+    validate_only!(only, fully_contained_children)
+    validate_relationship_names!(:except, except, fully_contained_children)
+  end
+
+  defp validate_only!(:all, _fully_contained_children), do: :ok
+
+  defp validate_only!({:only, only}, fully_contained_children) do
+    validate_relationship_names!(:only, only, fully_contained_children)
+  end
+
+  defp validate_relationship_names!(option, names, fully_contained_children) do
     valid_names = Enum.map(fully_contained_children, & &1.name)
 
-    Enum.each(except, fn name ->
+    Enum.each(names, fn name ->
       unless name in valid_names do
         raise """
-        #{inspect(name)} specified in `except` is not a fully-contained child relationship.
+        #{inspect(name)} specified in `#{option}` is not a fully-contained child relationship.
 
         Only fully-contained relationships can be archived:
         - has_one with no_attributes?: false, manual: nil, filters: []

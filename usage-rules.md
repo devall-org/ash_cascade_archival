@@ -62,6 +62,30 @@ defmodule MyApp.Post do
 end
 ```
 
+## Including Only Specific Relationships
+
+Use the `only` option to include a specific set of relationships:
+
+```elixir
+defmodule MyApp.Post do
+  use Ash.Resource,
+    extensions: [AshCascadeArchival.Resource]
+
+  cascade_archive do
+    only [:comments]
+  end
+
+  relationships do
+    has_many :comments, Comment
+    has_many :audit_logs, AuditLog  # This won't be archived
+  end
+end
+```
+
+You cannot use `only` and `except` together.
+When neither option is set, all fully-contained child relationships are archived.
+Use `only []` to archive no relationships.
+
 ## Validation
 
 AshCascadeArchival verifies bidirectional relationships. If a child has a `belongs_to` to an archival parent, the parent must have a corresponding fully-contained relationship back to the child.
@@ -116,7 +140,7 @@ end
 ```
 
 **Solution:** Choose one approach:
-- Use `cascade_archive` with `except` option for automatic configuration
+- Use `cascade_archive` with `only` or `except` for automatic configuration
 - Remove `AshCascadeArchival` extension and manually set `archive_related`
 
 ## Complex Relationships
@@ -147,5 +171,6 @@ For complex relationships:
 ## Best Practices
 
 - Use `cascade_archive` for most resources with standard relationships
+- Use `only` to archive a specific set of relationships
 - Use `except` to exclude specific relationships (e.g., audit logs, complex filtered relationships)
 - Define separate simple relationships for archival when you have complex filtered relationships
