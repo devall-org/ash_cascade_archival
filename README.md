@@ -9,7 +9,7 @@ Add `ash_cascade_archival` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:ash_cascade_archival, "~> 0.5.0"}
+    {:ash_cascade_archival, "~> 0.6.0"}
   ]
 end
 ```
@@ -122,6 +122,69 @@ end
 When neither option is set, all fully-contained child relationships are archived.
 Use `only []` to archive no relationships.
 
+### Deterministic Cascade Order
+
+`archive_related` is executed sequentially, so its order is the cascade
+execution order. Since 0.6.0 the list is sorted **alphabetically** by default
+(instead of following declaration order), so reordering relationships in the
+source file can never silently change cascade behavior.
+
+When the order matters — e.g. an [ash_borrow](https://hex.pm/packages/ash_borrow)
+guard requires borrowers to be archived before the borrowable — declare
+partial-order constraints with `order`:
+
+```elixir
+cascade_archive do
+  order [{:post_tags, :comments}]  # archive post_tags before comments
+end
+```
+
+Pairs are `{earlier, later}` and are applied on top of the alphabetical base
+order via a stable topological sort, so the result stays fully deterministic.
+Unknown names and cycles are compile errors.
+
+### Archival Destinations
+
+Cascading invokes each `archive_related` destination's **primary destroy
+action**, so that action decides what really happens: a soft destroy runs as
+an update (archiving when its changes set the archive attribute, as
+ash_archival's do), a non-soft destroy **hard-deletes**, and a missing
+destroy crashes at runtime. Since 0.6.0 the verifier classifies by that
+actual action (not by extension presence, which `exclude_destroy_actions`
+and custom soft destroys can contradict): a destination without a primary
+destroy action, with a non-soft one, or with a no-op soft one (no changes
+and no manual implementation) is rejected — make its destroys actually
+archive, exclude the relationship with `except`, or opt into hard deletion
+explicitly with `hard_delete`. The no-op check is a heuristic: any change or
+manual implementation counts as evidence of archiving; the verifier cannot
+prove your custom soft destroy really archives.
+
+> **Note**: Spark surfaces verifier errors as compiler *warnings* — the
+> module still compiles. Treat warnings as errors in CI
+> (`mix compile --warnings-as-errors`) to make these checks enforcing.
+
+### Intentional Hard Deletes
+
+Some children are worthless without their parent and need no soft-delete
+history (derived caches, computation results). Declare that the cascade
+really deletes them:
+
+```elixir
+cascade_archive do
+  hard_delete [:derived_caches]
+end
+```
+
+`hard_delete` destinations must have a non-soft primary destroy action: a
+soft one would archive (making the declaration misleading), and a missing
+one would crash the cascade at runtime — both are verified at compile time.
+
+Relationships marked by [ash_borrow](https://hex.pm/packages/ash_borrow)
+are recognized on both sides: `borrowed_by` is never included in
+`archive_related` (it points at borrowers, not contained children), and a
+`borrows` edge is exempt from the reverse-relationship requirement (it is a
+non-owning reference, not a containment chain).
+
 ### Validation
 
 `AshCascadeArchival` verifies that parent resources with `AshArchival` have proper reverse relationships. If a child has a `belongs_to` to an archival parent, the parent must have a corresponding fully-contained relationship back to the child.
@@ -138,8 +201,19 @@ has_one :post, MyApp.Post
 
 ## How It Works
 
-1. **Transformer**: Finds all fully-contained child relationships and sets `archive_related`
-2. **Verifier**: Ensures bidirectional relationships are properly configured for archival
+1. **Transformer**: Finds all fully-contained child relationships, sets `archive_related`, and orders it (alphabetical base + `order` pairs)
+2. **Verifiers**: Ensure bidirectional relationships are properly configured for archival, and that every `archive_related` destination is itself archival
+
+## Breaking changes in 0.6.0
+
+- `archive_related` is now sorted alphabetically instead of following
+  relationship declaration order. If your code depended on the previous
+  implicit order, declare it explicitly with the `order` option.
+- A relationship in `archive_related` whose destination has no primary
+  destroy action, or a non-soft one, is now a compile error (previously the
+  cascade silently hard-deleted or crashed on such destinations). Make the
+  destination's destroys soft, use `except`, or declare the intent with
+  `hard_delete`.
 
 ## Configuration
 

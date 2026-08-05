@@ -11,6 +11,10 @@ defmodule AshCascadeArchival.Test.Support.TestResources do
       uuid_primary_key :id
     end
 
+    actions do
+      defaults [:read, :destroy]
+    end
+
     relationships do
       has_many :posts, TestResources.Post
       has_many :comments, TestResources.Comment
@@ -23,6 +27,10 @@ defmodule AshCascadeArchival.Test.Support.TestResources do
 
     attributes do
       uuid_primary_key :id
+    end
+
+    actions do
+      defaults [:read, :destroy]
     end
 
     relationships do
@@ -43,6 +51,10 @@ defmodule AshCascadeArchival.Test.Support.TestResources do
       uuid_primary_key :id
     end
 
+    actions do
+      defaults [:read, :destroy]
+    end
+
     relationships do
       belongs_to :author, TestResources.Author
       belongs_to :post, TestResources.Post
@@ -57,6 +69,10 @@ defmodule AshCascadeArchival.Test.Support.TestResources do
       uuid_primary_key :id
     end
 
+    actions do
+      defaults [:read, :destroy]
+    end
+
     relationships do
       belongs_to :post, TestResources.Post
       belongs_to :tag, TestResources.Tag
@@ -69,6 +85,10 @@ defmodule AshCascadeArchival.Test.Support.TestResources do
 
     attributes do
       uuid_primary_key :id
+    end
+
+    actions do
+      defaults [:read, :destroy]
     end
 
     relationships do
@@ -147,12 +167,39 @@ defmodule AshCascadeArchival.Test.Support.TestResources do
     end
   end
 
+  defmodule PostWithOrder do
+    @moduledoc false
+    use Ash.Resource, domain: nil, extensions: [AshCascadeArchival.Resource]
+
+    cascade_archive do
+      order [{:post_tags, :comments}]
+    end
+
+    attributes do
+      uuid_primary_key :id
+    end
+
+    relationships do
+      has_many :comments, TestResources.Comment do
+        destination_attribute :post_id
+      end
+
+      has_many :post_tags, TestResources.PostTag do
+        destination_attribute :post_id
+      end
+    end
+  end
+
   defmodule PostWithFilteredRelationship do
     @moduledoc false
     use Ash.Resource, domain: nil, extensions: [AshCascadeArchival.Resource]
 
     attributes do
       uuid_primary_key :id
+    end
+
+    actions do
+      defaults [:read, :destroy]
     end
 
     relationships do

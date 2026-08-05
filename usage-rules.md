@@ -86,6 +86,65 @@ You cannot use `only` and `except` together.
 When neither option is set, all fully-contained child relationships are archived.
 Use `only []` to archive no relationships.
 
+## Cascade Order
+
+`archive_related` executes sequentially, so its order is the cascade order.
+The list is sorted alphabetically by default; declaration order is ignored.
+
+Use the `order` option to declare partial-order constraints as
+`{earlier, later}` pairs — no need to enumerate the full list:
+
+```elixir
+cascade_archive do
+  order [{:post_tags, :comments}]  # archive post_tags before comments
+end
+```
+
+Pairs are applied on top of the alphabetical base order via a stable
+topological sort. Unknown names and cycles raise at compile time.
+
+## Archival Destinations
+
+Cascading calls each `archive_related` destination's primary destroy action,
+so that action decides the outcome: soft destroy runs as an update (it
+archives only when its changes or manual implementation set the archive
+attribute), non-soft destroy hard-deletes, missing destroy crashes at
+runtime. The verifier classifies by the actual primary destroy action (not
+extension presence). A destination with a missing, non-soft, or no-op soft
+(no changes, no manual) primary destroy is rejected; make its destroys
+actually archive, exclude the relationship with `except`, or opt in with
+`hard_delete`. The no-op check is a heuristic — any change counts as
+evidence; the verifier cannot prove a custom change archives.
+
+Spark surfaces verifier errors as compiler warnings, so run CI with
+`mix compile --warnings-as-errors` to make all of this library's checks
+enforcing.
+
+## Intentional Hard Deletes
+
+Use `hard_delete` for children that are worthless without their parent and
+need no soft-delete history (derived caches, computation results):
+
+```elixir
+cascade_archive do
+  hard_delete [:derived_caches]
+end
+```
+
+Verified at compile time: `hard_delete` destinations must have a non-soft
+primary destroy action (a soft one would archive, making the declaration
+misleading; a missing one would crash the cascade). Names must be part of
+the final archive_related. Do not use `hard_delete` for resources referenced
+elsewhere via foreign keys (e.g. `ash_borrow` borrowables) — the database
+will reject the delete.
+
+Relationships marked by `ash_borrow` are recognized on both sides:
+`:__borrowed_by__` has_many/has_one relationships are never treated as
+fully-contained children (excluded from `archive_related` automatically),
+and `:__borrows__` belongs_to relationships are exempt from the
+reverse-relationship validation (non-owning references form no containment
+chain).
+
 ## Validation
 
 AshCascadeArchival verifies bidirectional relationships. If a child has a `belongs_to` to an archival parent, the parent must have a corresponding fully-contained relationship back to the child.
@@ -165,8 +224,8 @@ For complex relationships:
 
 ## How It Works
 
-1. **Transformer**: Scans all relationships, finds fully-contained children, and sets `archive_related`
-2. **Verifier**: Validates bidirectional relationships for archival consistency
+1. **Transformer**: Scans all relationships, finds fully-contained children, sets `archive_related`, and orders it (alphabetical base + `order` pairs)
+2. **Verifiers**: Validate bidirectional relationships for archival consistency, and that every `archive_related` destination is archival
 
 ## Best Practices
 

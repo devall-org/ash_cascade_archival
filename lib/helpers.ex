@@ -7,14 +7,25 @@ defmodule AshCascadeArchival.Helpers do
   Returns true if the child relationship is fully-contained (child is completely owned by parent).
   Only applies to has_one and has_many relationships.
   many_to_many is excluded because archive_related would target the destination, not the through resource.
+  Relationships marked as `borrowed_by` (see `ash_borrow`) are excluded: they point at
+  borrowers of this resource, not contained children, and archiving them would drag
+  the borrowers down with the borrowed resource.
   """
   def fully_contained_child?(rel) do
     case rel do
-      %HasOne{no_attributes?: false, manual: nil, filters: []} -> true
-      %HasMany{no_attributes?: false, manual: nil, filters: []} -> true
+      %HasOne{no_attributes?: false, manual: nil, filters: []} -> not borrowed_by?(rel)
+      %HasMany{no_attributes?: false, manual: nil, filters: []} -> not borrowed_by?(rel)
       _ -> false
     end
   end
+
+  defp borrowed_by?(rel), do: Map.get(rel, :__borrowed_by__, false) == true
+
+  @doc """
+  Returns true if the relationship is a `borrows` edge (see `ash_borrow`):
+  a non-owning belongs_to that must not be treated as a containment chain.
+  """
+  def borrows?(rel), do: Map.get(rel, :__borrows__, false) == true
 
   @doc """
   Returns true if the child relationship points to the given module.

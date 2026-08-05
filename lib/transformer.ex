@@ -51,6 +51,7 @@ defmodule AshCascadeArchival.Transformer do
     resource = Transformer.get_persisted(dsl_state, :module)
     except = AshCascadeArchival.Info.cascade_archive_except!(dsl_state)
     only = fetch_only(dsl_state)
+    order = AshCascadeArchival.Info.cascade_archive_order!(dsl_state)
 
     # Find all fully-contained child relationships
     fully_contained_children =
@@ -60,10 +61,16 @@ defmodule AshCascadeArchival.Transformer do
 
     validate_options!(only, except, fully_contained_children)
 
+    hard_delete = AshCascadeArchival.Info.cascade_archive_hard_delete!(dsl_state)
+
     archive_related =
       fully_contained_children
       |> filter_archive_related(only, except)
       |> Enum.map(& &1.name)
+      |> Enum.sort()
+      |> apply_order(order)
+
+    validate_hard_delete_names!(hard_delete, archive_related)
 
     if log_enabled?() and not Enum.empty?(archive_related) do
       Logger.info(
@@ -78,6 +85,75 @@ defmodule AshCascadeArchival.Transformer do
        :archive_related,
        archive_related
      )}
+  end
+
+  # Applies {earlier, later} partial-order pairs to the alphabetically sorted
+  # name list via a stable topological sort: among the ready names, the
+  # alphabetically smallest is always picked, so the result is deterministic.
+  defp apply_order(names, []), do: names
+
+  defp apply_order(names, pairs) do
+    validate_order_names!(pairs, names)
+
+    predecessors =
+      Enum.reduce(pairs, Map.new(names, &{&1, MapSet.new()}), fn {earlier, later}, acc ->
+        Map.update!(acc, later, &MapSet.put(&1, earlier))
+      end)
+
+    topo_sort(names, predecessors, [])
+  end
+
+  defp topo_sort([], _predecessors, acc), do: Enum.reverse(acc)
+
+  defp topo_sort(remaining, predecessors, acc) do
+    remaining_set = MapSet.new(remaining)
+
+    case Enum.find(remaining, &MapSet.disjoint?(predecessors[&1], remaining_set)) do
+      nil ->
+        raise """
+        `order` in `cascade_archive` contains a cycle among: #{inspect(remaining)}
+
+        Pairs must form a partial order: {earlier, later} means `earlier` is archived before `later`.
+        """
+
+      name ->
+        topo_sort(remaining -- [name], predecessors, [name | acc])
+    end
+  end
+
+  defp validate_hard_delete_names!(hard_delete, archive_related) do
+    hard_delete
+    |> Enum.reject(&(&1 in archive_related))
+    |> case do
+      [] ->
+        :ok
+
+      unknown ->
+        raise """
+        #{inspect(unknown)} specified in `hard_delete` are not part of archive_related.
+
+        Only relationships that end up in archive_related can be marked for hard delete.
+        Current archive_related: #{inspect(archive_related)}
+        """
+    end
+  end
+
+  defp validate_order_names!(pairs, names) do
+    pairs
+    |> Enum.flat_map(fn {earlier, later} -> [earlier, later] end)
+    |> Enum.reject(&(&1 in names))
+    |> case do
+      [] ->
+        :ok
+
+      unknown ->
+        raise """
+        #{inspect(Enum.uniq(unknown))} specified in `order` are not part of archive_related.
+
+        Only relationships that end up in archive_related can be ordered.
+        Current archive_related: #{inspect(names)}
+        """
+    end
   end
 
   defp fetch_only(dsl_state) do

@@ -1,4 +1,4 @@
-spark_locals_without_parens = [except: 1, only: 1]
+spark_locals_without_parens = [except: 1, hard_delete: 1, only: 1, order: 1]
 
 [
   import_deps: [:spark, :reactor, :ash],
