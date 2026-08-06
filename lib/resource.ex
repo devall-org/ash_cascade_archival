@@ -57,5 +57,9 @@ defmodule AshCascadeArchival.Resource do
     sections: [@cascade_archive],
     add_extensions: [AshArchival.Resource],
     transformers: [AshCascadeArchival.Transformer],
-    verifiers: [AshCascadeArchival.Verifier, AshCascadeArchival.Verifier.ArchivalDestinations]
+    verifiers: [
+      AshCascadeArchival.Verifier,
+      AshCascadeArchival.Verifier.ArchivalDestinations,
+      AshCascadeArchival.Verifier.UseOrder
+    ]
 end

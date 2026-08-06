@@ -135,13 +135,13 @@ Verified at compile time: `hard_delete` destinations must have a non-soft
 primary destroy action (a soft one would archive, making the declaration
 misleading; a missing one would crash the cascade). Names must be part of
 the final archive_related. Do not use `hard_delete` for resources referenced
-elsewhere via foreign keys (e.g. `ash_borrow` borrowables) — the database
+elsewhere via foreign keys (e.g. `ash_borrow` used resources) — the database
 will reject the delete.
 
 Relationships marked by `ash_borrow` are recognized on both sides:
-`:__borrowed_by__` has_many/has_one relationships are never treated as
+`:__used_by__` has_many/has_one relationships are never treated as
 fully-contained children (excluded from `archive_related` automatically),
-and `:__borrows__` belongs_to relationships are exempt from the
+and `:__uses__` belongs_to relationships are exempt from the
 reverse-relationship validation (non-owning references form no containment
 chain).
 

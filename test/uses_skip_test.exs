@@ -1,9 +1,9 @@
-defmodule AshCascadeArchival.BorrowsSkipTest do
+defmodule AshCascadeArchival.UsesSkipTest do
   use ExUnit.Case, async: true
 
   import Spark.Test
 
-  defmodule BorrowTarget do
+  defmodule UseTarget do
     @moduledoc false
     # Archival resource with no reverse relationship at all.
     use Ash.Resource, domain: nil, extensions: [AshCascadeArchival.Resource]
@@ -17,15 +17,15 @@ defmodule AshCascadeArchival.BorrowsSkipTest do
     end
   end
 
-  test "a belongs_to carrying the :__borrows__ marker needs no reverse relationship" do
+  test "a belongs_to carrying the :__uses__ marker needs no reverse relationship" do
     refute_dsl_errors do
-      defmodule MarkedBorrower do
+      defmodule MarkedUser do
         @moduledoc false
         use Ash.Resource,
           domain: nil,
           extensions: [
             AshCascadeArchival.Resource,
-            AshCascadeArchival.Test.Support.FakeBorrow
+            AshCascadeArchival.Test.Support.FakeUses
           ]
 
         attributes do
@@ -33,25 +33,25 @@ defmodule AshCascadeArchival.BorrowsSkipTest do
         end
 
         relationships do
-          fake_borrows(:borrow_target, AshCascadeArchival.BorrowsSkipTest.BorrowTarget)
+          fake_uses(:use_target, AshCascadeArchival.UsesSkipTest.UseTarget)
         end
       end
     end
 
     rel =
       Ash.Resource.Info.relationship(
-        AshCascadeArchival.BorrowsSkipTest.MarkedBorrower,
-        :borrow_target
+        AshCascadeArchival.UsesSkipTest.MarkedUser,
+        :use_target
       )
 
-    assert AshCascadeArchival.Helpers.borrows?(rel)
+    assert AshCascadeArchival.Helpers.uses?(rel)
   end
 
   test "the same shape without the marker still demands a reverse relationship" do
     # The reverse verifier reports plain string errors, not DslError structs.
     error =
       assert_dsl_error error when is_binary(error) do
-        defmodule PlainBorrower do
+        defmodule PlainUser do
           @moduledoc false
           use Ash.Resource, domain: nil, extensions: [AshCascadeArchival.Resource]
 
@@ -60,7 +60,7 @@ defmodule AshCascadeArchival.BorrowsSkipTest do
           end
 
           relationships do
-            belongs_to :borrow_target, AshCascadeArchival.BorrowsSkipTest.BorrowTarget
+            belongs_to :use_target, AshCascadeArchival.UsesSkipTest.UseTarget
           end
         end
       end

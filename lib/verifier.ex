@@ -9,15 +9,15 @@ defmodule AshCascadeArchival.Verifier do
   def verify(dsl_state) do
     child_module = dsl_state |> Verifier.get_persisted(:module)
 
-    # `borrows` edges (see ash_borrow) are non-owning references, not
-    # containment chains: their targets never take the borrower down, so no
+    # `uses` edges (see ash_borrow) are non-owning references, not
+    # containment chains: their targets never take the user down, so no
     # reverse fully-contained relationship is required (nor possible — the
-    # reverse side is a `borrowed_by`, which is excluded from containment).
+    # reverse side is a `used_by`, which is excluded from containment).
     belongs_to_rels =
       dsl_state
       |> Ash.Resource.Info.relationships()
       |> Enum.filter(fn
-        %BelongsTo{} = rel -> not Helpers.borrows?(rel)
+        %BelongsTo{} = rel -> not Helpers.uses?(rel)
         %{} -> false
       end)
 

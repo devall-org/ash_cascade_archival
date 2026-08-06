@@ -119,8 +119,8 @@ defmodule AshCascadeArchival.TransformerTest do
     end
   end
 
-  describe "borrowed_by exclusion" do
-    test "a has_many carrying the :__borrowed_by__ marker is not fully contained" do
+  describe "used_by exclusion" do
+    test "a has_many carrying the :__used_by__ marker is not fully contained" do
       plain = %Ash.Resource.Relationships.HasMany{
         no_attributes?: false,
         manual: nil,
@@ -129,16 +129,14 @@ defmodule AshCascadeArchival.TransformerTest do
 
       assert AshCascadeArchival.Helpers.fully_contained_child?(plain)
 
-      refute AshCascadeArchival.Helpers.fully_contained_child?(
-               Map.put(plain, :__borrowed_by__, true)
-             )
+      refute AshCascadeArchival.Helpers.fully_contained_child?(Map.put(plain, :__used_by__, true))
     end
 
-    test "a belongs_to carrying the :__borrows__ marker is recognized" do
+    test "a belongs_to carrying the :__uses__ marker is recognized" do
       plain = %Ash.Resource.Relationships.BelongsTo{}
 
-      refute AshCascadeArchival.Helpers.borrows?(plain)
-      assert AshCascadeArchival.Helpers.borrows?(Map.put(plain, :__borrows__, true))
+      refute AshCascadeArchival.Helpers.uses?(plain)
+      assert AshCascadeArchival.Helpers.uses?(Map.put(plain, :__uses__, true))
     end
   end
 

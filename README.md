@@ -130,7 +130,7 @@ execution order. Since 0.6.0 the list is sorted **alphabetically** by default
 source file can never silently change cascade behavior.
 
 When the order matters — e.g. an [ash_borrow](https://hex.pm/packages/ash_borrow)
-guard requires borrowers to be archived before the borrowable — declare
+guard requires users to be archived before the used resource — declare
 partial-order constraints with `order`:
 
 ```elixir
@@ -180,9 +180,9 @@ soft one would archive (making the declaration misleading), and a missing
 one would crash the cascade at runtime — both are verified at compile time.
 
 Relationships marked by [ash_borrow](https://hex.pm/packages/ash_borrow)
-are recognized on both sides: `borrowed_by` is never included in
-`archive_related` (it points at borrowers, not contained children), and a
-`borrows` edge is exempt from the reverse-relationship requirement (it is a
+are recognized on both sides: `used_by` is never included in
+`archive_related` (it points at users, not contained children), and a
+`uses` edge is exempt from the reverse-relationship requirement (it is a
 non-owning reference, not a containment chain).
 
 ### Validation
