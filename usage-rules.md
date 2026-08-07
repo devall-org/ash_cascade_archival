@@ -91,17 +91,19 @@ Use `only []` to archive no relationships.
 `archive_related` executes sequentially, so its order is the cascade order.
 The list is sorted alphabetically by default; declaration order is ignored.
 
-Use the `order` option to declare partial-order constraints as
-`{earlier, later}` pairs — no need to enumerate the full list:
+Use `archive_last` to pin the tail. Only the tail needs stating: independent
+children can be archived at any point, so the constraint is always "these go
+last, in this order".
 
 ```elixir
 cascade_archive do
-  order [{:post_tags, :comments}]  # archive post_tags before comments
+  archive_last [:post_tags, :comments]  # ...everything else..., post_tags, comments
 end
 ```
 
-Pairs are applied on top of the alphabetical base order via a stable
-topological sort. Unknown names and cycles raise at compile time.
+Named relationships are removed from the alphabetical base and appended in the
+order given. `AshCascadeArchival.Verifier.UseOrder` reports a ready-to-paste
+`archive_last` when the order is wrong.
 
 ## Archival Destinations
 
@@ -224,7 +226,7 @@ For complex relationships:
 
 ## How It Works
 
-1. **Transformer**: Scans all relationships, finds fully-contained children, sets `archive_related`, and orders it (alphabetical base + `order` pairs)
+1. **Transformer**: Scans all relationships, finds fully-contained children, sets `archive_related`, and orders it (alphabetical base + `archive_last` tail)
 2. **Verifiers**: Validate bidirectional relationships for archival consistency, and that every `archive_related` destination is archival
 
 ## Best Practices

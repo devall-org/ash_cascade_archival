@@ -129,19 +129,23 @@ execution order. Since 0.6.0 the list is sorted **alphabetically** by default
 (instead of following declaration order), so reordering relationships in the
 source file can never silently change cascade behavior.
 
-When the order matters — e.g. an [ash_borrow](https://hex.pm/packages/ash_borrow)
-guard requires users to be archived before the used resource — declare
-partial-order constraints with `order`:
+When the order matters — e.g. an [ash_ownership](https://hex.pm/packages/ash_ownership)
+`used_by` destination must be archived *after* everything that uses it — pin the
+tail with `archive_last`:
 
 ```elixir
 cascade_archive do
-  order [{:post_tags, :comments}]  # archive post_tags before comments
+  archive_last [:post_tags, :comments]  # ...everything else..., post_tags, comments
 end
 ```
 
-Pairs are `{earlier, later}` and are applied on top of the alphabetical base
-order via a stable topological sort, so the result stays fully deterministic.
-Unknown names and cycles are compile errors.
+Only the tail needs stating. Independent children can be archived at any point,
+so the constraint is always "these go last, in this order" — never "this goes
+first". Named relationships are removed from the alphabetical base and appended
+in the order given, which is enough to express any order the cascade needs.
+
+`AshCascadeArchival.Verifier.UseOrder` checks the result against the actual
+`used_by` edges and, when it fails, reports a ready-to-paste `archive_last`.
 
 ### Archival Destinations
 
@@ -201,14 +205,14 @@ has_one :post, MyApp.Post
 
 ## How It Works
 
-1. **Transformer**: Finds all fully-contained child relationships, sets `archive_related`, and orders it (alphabetical base + `order` pairs)
+1. **Transformer**: Finds all fully-contained child relationships, sets `archive_related`, and orders it (alphabetical base + `archive_last` tail)
 2. **Verifiers**: Ensure bidirectional relationships are properly configured for archival, and that every `archive_related` destination is itself archival
 
 ## Breaking changes in 0.6.0
 
 - `archive_related` is now sorted alphabetically instead of following
   relationship declaration order. If your code depended on the previous
-  implicit order, declare it explicitly with the `order` option.
+  implicit order, declare it explicitly with the `archive_last` option.
 - A relationship in `archive_related` whose destination has no primary
   destroy action, or a non-soft one, is now a compile error (previously the
   cascade silently hard-deleted or crashed on such destinations). Make the

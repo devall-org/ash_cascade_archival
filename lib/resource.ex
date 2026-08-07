@@ -28,38 +28,21 @@ defmodule AshCascadeArchival.Resource do
         required: false,
         doc: "List of relationships to include in archival. Cannot be used with except."
       ],
-      order_first: [
-        type: {:wrap_list, :atom},
-        required: false,
-        default: [],
-        doc: """
-        Relationships to archive before all others, in the given order.
-
-        The common constraint is not "a before b" but "these go first" or "these
-        go last" — a used resource is typically used by many of its siblings.
-        Expressing that as `order` pairs takes one pair per couple and goes stale
-        whenever a sibling is added, so state the position directly.
-        """
-      ],
-      order_last: [
+      archive_last: [
         type: {:wrap_list, :atom},
         required: false,
         default: [],
         doc: """
         Relationships to archive after all others, in the given order.
 
-        See `order_first`.
-        """
-      ],
-      order: [
-        type: {:list, {:tuple, [:atom, :atom]}},
-        required: false,
-        default: [],
-        doc: """
-        Partial-order constraints as {earlier, later} pairs, for constraints that
-        are neither "first" nor "last". archive_related is sorted alphabetically,
-        `order_first`/`order_last` move their entries to the ends, then these pairs
-        are applied via a stable topological sort.
+        `archive_related` is sorted alphabetically and these are then moved to the
+        end, keeping the order given here. Since the tail can name every relationship
+        that participates in a constraint, this one option expresses any order the
+        cascade needs.
+
+        The constraint is almost always "these go last": a used resource is used by
+        many of its siblings, so stating the position directly beats one pair per
+        couple, which goes stale whenever a sibling is added.
         """
       ],
       hard_delete: [

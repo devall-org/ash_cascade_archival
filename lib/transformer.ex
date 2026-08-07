@@ -51,9 +51,7 @@ defmodule AshCascadeArchival.Transformer do
     resource = Transformer.get_persisted(dsl_state, :module)
     except = AshCascadeArchival.Info.cascade_archive_except!(dsl_state)
     only = fetch_only(dsl_state)
-    order = AshCascadeArchival.Info.cascade_archive_order!(dsl_state)
-    order_first = AshCascadeArchival.Info.cascade_archive_order_first!(dsl_state)
-    order_last = AshCascadeArchival.Info.cascade_archive_order_last!(dsl_state)
+    archive_last = AshCascadeArchival.Info.cascade_archive_archive_last!(dsl_state)
 
     # Find all fully-contained child relationships
     fully_contained_children =
@@ -70,8 +68,7 @@ defmodule AshCascadeArchival.Transformer do
       |> filter_archive_related(only, except)
       |> Enum.map(& &1.name)
       |> Enum.sort()
-      |> apply_ends(order_first, order_last)
-      |> apply_order(order)
+      |> apply_archive_last(archive_last)
 
     validate_hard_delete_names!(hard_delete, archive_related)
 
@@ -90,14 +87,14 @@ defmodule AshCascadeArchival.Transformer do
      )}
   end
 
-  # Moves the named relationships to the front and to the back, keeping the
-  # order they were declared in. Everything else stays alphabetical in between.
-  defp apply_ends(names, [], []), do: names
+  # Moves the named relationships to the back, keeping the order they were
+  # declared in. Everything else stays alphabetical in front of them.
+  defp apply_archive_last(names, []), do: names
 
-  defp apply_ends(names, first, last) do
-    validate_end_names!(first ++ last, names)
+  defp apply_archive_last(names, last) do
+    validate_end_names!(last, names)
 
-    first ++ (names -- (first -- last)) ++ last
+    Enum.reject(names, &(&1 in last)) ++ last
   end
 
   defp validate_end_names!(named, names) do
@@ -107,45 +104,11 @@ defmodule AshCascadeArchival.Transformer do
 
       unknown ->
         raise """
-        #{inspect(Enum.uniq(unknown))} specified in `order_first`/`order_last` are not \
+        #{inspect(Enum.uniq(unknown))} specified in `archive_last` are not \
         part of archive_related.
 
         Only relationships that end up in archive_related can be ordered.
         """
-    end
-  end
-
-  # Applies {earlier, later} partial-order pairs to the alphabetically sorted
-  # name list via a stable topological sort: among the ready names, the
-  # alphabetically smallest is always picked, so the result is deterministic.
-  defp apply_order(names, []), do: names
-
-  defp apply_order(names, pairs) do
-    validate_order_names!(pairs, names)
-
-    predecessors =
-      Enum.reduce(pairs, Map.new(names, &{&1, MapSet.new()}), fn {earlier, later}, acc ->
-        Map.update!(acc, later, &MapSet.put(&1, earlier))
-      end)
-
-    topo_sort(names, predecessors, [])
-  end
-
-  defp topo_sort([], _predecessors, acc), do: Enum.reverse(acc)
-
-  defp topo_sort(remaining, predecessors, acc) do
-    remaining_set = MapSet.new(remaining)
-
-    case Enum.find(remaining, &MapSet.disjoint?(predecessors[&1], remaining_set)) do
-      nil ->
-        raise """
-        `order` in `cascade_archive` contains a cycle among: #{inspect(remaining)}
-
-        Pairs must form a partial order: {earlier, later} means `earlier` is archived before `later`.
-        """
-
-      name ->
-        topo_sort(remaining -- [name], predecessors, [name | acc])
     end
   end
 
@@ -162,24 +125,6 @@ defmodule AshCascadeArchival.Transformer do
 
         Only relationships that end up in archive_related can be marked for hard delete.
         Current archive_related: #{inspect(archive_related)}
-        """
-    end
-  end
-
-  defp validate_order_names!(pairs, names) do
-    pairs
-    |> Enum.flat_map(fn {earlier, later} -> [earlier, later] end)
-    |> Enum.reject(&(&1 in names))
-    |> case do
-      [] ->
-        :ok
-
-      unknown ->
-        raise """
-        #{inspect(Enum.uniq(unknown))} specified in `order` are not part of archive_related.
-
-        Only relationships that end up in archive_related can be ordered.
-        Current archive_related: #{inspect(names)}
         """
     end
   end

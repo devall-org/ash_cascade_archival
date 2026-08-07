@@ -7,19 +7,30 @@ defmodule AshCascadeArchival.Helpers do
   Returns true if the child relationship is fully-contained (child is completely owned by parent).
   Only applies to has_one and has_many relationships.
   many_to_many is excluded because archive_related would target the destination, not the through resource.
-  Relationships marked as `used_by` (see `ash_borrow`) are excluded: they point at
+  Relationships marked as `used_by` (see `ash_ownership`) are excluded: they point at
   users of this resource, not contained children, and archiving them would drag
   the users down with the used resource.
+
+  Relationships marked with `__cascade_skip__` are excluded too. Extensions that
+  generate several relationships over the same rows use it to nominate one of them
+  as the cascade path, so the parent does not walk the same children repeatedly.
   """
   def fully_contained_child?(rel) do
     case rel do
-      %HasOne{no_attributes?: false, manual: nil, filters: []} -> not used_by?(rel)
-      %HasMany{no_attributes?: false, manual: nil, filters: []} -> not used_by?(rel)
+      %HasOne{no_attributes?: false, manual: nil, filters: []} -> contained?(rel)
+      %HasMany{no_attributes?: false, manual: nil, filters: []} -> contained?(rel)
       _ -> false
     end
   end
 
+  defp contained?(rel), do: not used_by?(rel) and not cascade_skip?(rel)
+
   defp used_by?(rel), do: Map.get(rel, :__used_by__, false) == true
+
+  @doc """
+  Returns true if the relationship opted out of being a cascade path.
+  """
+  def cascade_skip?(rel), do: Map.get(rel, :__cascade_skip__, false) == true
 
   @doc """
   Returns true if the relationship is a `uses` edge (see `ash_borrow`):

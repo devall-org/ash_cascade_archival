@@ -68,14 +68,21 @@ defmodule AshCascadeArchival.TransformerTest do
       assert archive_related == [:post_tags, :comments]
     end
 
-    test "order pairs naming relationships outside archive_related raise" do
+    test "archive_last moves names to the end without duplicating them" do
+      archive_related =
+        AshArchival.Resource.Info.archive_archive_related!(TestResources.PostWithEnds)
+
+      assert archive_related == [:attachments, :post_tags, :comments]
+    end
+
+    test "archive_last naming relationships outside archive_related raise" do
       assert_raise RuntimeError, ~r/not part of archive_related/, fn ->
-        defmodule PostWithUnknownOrder do
+        defmodule PostWithUnknownEnd do
           @moduledoc false
           use Ash.Resource, domain: nil, extensions: [AshCascadeArchival.Resource]
 
           cascade_archive do
-            order [{:comments, :nonexistent}]
+            archive_last([:nonexistent])
           end
 
           attributes do
@@ -83,7 +90,7 @@ defmodule AshCascadeArchival.TransformerTest do
           end
 
           relationships do
-            has_many :comments, AshCascadeArchival.Test.Support.TestResources.Comment do
+            has_many :comments, TestResources.Comment do
               destination_attribute :post_id
             end
           end
@@ -91,35 +98,6 @@ defmodule AshCascadeArchival.TransformerTest do
       end
     end
 
-    test "order pairs forming a cycle raise" do
-      assert_raise RuntimeError, ~r/cycle/, fn ->
-        defmodule PostWithCyclicOrder do
-          @moduledoc false
-          use Ash.Resource, domain: nil, extensions: [AshCascadeArchival.Resource]
-
-          cascade_archive do
-            order [{:comments, :post_tags}, {:post_tags, :comments}]
-          end
-
-          attributes do
-            uuid_primary_key :id
-          end
-
-          relationships do
-            has_many :comments, AshCascadeArchival.Test.Support.TestResources.Comment do
-              destination_attribute :post_id
-            end
-
-            has_many :post_tags, AshCascadeArchival.Test.Support.TestResources.PostTag do
-              destination_attribute :post_id
-            end
-          end
-        end
-      end
-    end
-  end
-
-  describe "used_by exclusion" do
     test "a has_many carrying the :__used_by__ marker is not fully contained" do
       plain = %Ash.Resource.Relationships.HasMany{
         no_attributes?: false,

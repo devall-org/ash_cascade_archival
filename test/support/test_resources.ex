@@ -172,7 +172,7 @@ defmodule AshCascadeArchival.Test.Support.TestResources do
     use Ash.Resource, domain: nil, extensions: [AshCascadeArchival.Resource]
 
     cascade_archive do
-      order [{:post_tags, :comments}]
+      archive_last([:comments])
     end
 
     attributes do
@@ -181,6 +181,33 @@ defmodule AshCascadeArchival.Test.Support.TestResources do
 
     relationships do
       has_many :comments, TestResources.Comment do
+        destination_attribute :post_id
+      end
+
+      has_many :post_tags, TestResources.PostTag do
+        destination_attribute :post_id
+      end
+    end
+  end
+
+  defmodule PostWithEnds do
+    @moduledoc false
+    use Ash.Resource, domain: nil, extensions: [AshCascadeArchival.Resource]
+
+    cascade_archive do
+      archive_last([:comments])
+    end
+
+    attributes do
+      uuid_primary_key :id
+    end
+
+    relationships do
+      has_many :comments, TestResources.Comment do
+        destination_attribute :post_id
+      end
+
+      has_many :attachments, TestResources.Comment do
         destination_attribute :post_id
       end
 

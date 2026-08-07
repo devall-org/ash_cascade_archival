@@ -75,7 +75,7 @@ defmodule AshCascadeArchival.UseOrderTest do
         end
       end
 
-    assert error.message =~ "order [{:members, :groups}]"
+    assert error.message =~ "archive_last [:members, :groups]"
   end
 
   test "declaring the order explicitly resolves it" do
@@ -106,7 +106,7 @@ defmodule AshCascadeArchival.UseOrderTest do
         end
 
         cascade_archive do
-          order [{:members, :groups}]
+          archive_last([:groups])
         end
       end
     end
