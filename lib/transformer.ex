@@ -52,6 +52,8 @@ defmodule AshCascadeArchival.Transformer do
     except = AshCascadeArchival.Info.cascade_archive_except!(dsl_state)
     only = fetch_only(dsl_state)
     order = AshCascadeArchival.Info.cascade_archive_order!(dsl_state)
+    order_first = AshCascadeArchival.Info.cascade_archive_order_first!(dsl_state)
+    order_last = AshCascadeArchival.Info.cascade_archive_order_last!(dsl_state)
 
     # Find all fully-contained child relationships
     fully_contained_children =
@@ -68,6 +70,7 @@ defmodule AshCascadeArchival.Transformer do
       |> filter_archive_related(only, except)
       |> Enum.map(& &1.name)
       |> Enum.sort()
+      |> apply_ends(order_first, order_last)
       |> apply_order(order)
 
     validate_hard_delete_names!(hard_delete, archive_related)
@@ -85,6 +88,31 @@ defmodule AshCascadeArchival.Transformer do
        :archive_related,
        archive_related
      )}
+  end
+
+  # Moves the named relationships to the front and to the back, keeping the
+  # order they were declared in. Everything else stays alphabetical in between.
+  defp apply_ends(names, [], []), do: names
+
+  defp apply_ends(names, first, last) do
+    validate_end_names!(first ++ last, names)
+
+    first ++ (names -- (first -- last)) ++ last
+  end
+
+  defp validate_end_names!(named, names) do
+    case named -- names do
+      [] ->
+        :ok
+
+      unknown ->
+        raise """
+        #{inspect(Enum.uniq(unknown))} specified in `order_first`/`order_last` are not \
+        part of archive_related.
+
+        Only relationships that end up in archive_related can be ordered.
+        """
+    end
   end
 
   # Applies {earlier, later} partial-order pairs to the alphabetically sorted
