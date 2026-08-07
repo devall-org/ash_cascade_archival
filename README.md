@@ -183,11 +183,29 @@ end
 soft one would archive (making the declaration misleading), and a missing
 one would crash the cascade at runtime — both are verified at compile time.
 
-Relationships marked by [ash_borrow](https://hex.pm/packages/ash_borrow)
-are recognized on both sides: `used_by` is never included in
-`archive_related` (it points at users, not contained children), and a
-`uses` edge is exempt from the reverse-relationship requirement (it is a
-non-owning reference, not a containment chain).
+Relationships marked by [ash_ownership](https://hex.pm/packages/ash_ownership)
+are recognized on all three sides: `used_by` is never included in
+`archive_related` (it points at users, not contained children), a `uses`
+edge is exempt from the reverse-relationship requirement (it is a
+non-owning reference, not a containment chain), and an `ancestor` edge is
+too (the real parent is a different relationship, and the cascade reaches
+the record through it).
+
+### Opting a relationship out of the cascade
+
+A relationship carrying a `__cascade_skip__` map key is never treated as a
+fully-contained child. Extensions that generate several relationships over
+the same rows — differing only in a filter or a read-action argument — use
+it to nominate one of them as the cascade path, so the parent does not walk
+the same children once per view:
+
+```elixir
+%{relationship | name: :visible_customers}
+|> Map.put(:__cascade_skip__, true)
+```
+
+The marker is a plain map key, so declaring it costs no dependency in
+either direction.
 
 ### Validation
 

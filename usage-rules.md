@@ -137,15 +137,19 @@ Verified at compile time: `hard_delete` destinations must have a non-soft
 primary destroy action (a soft one would archive, making the declaration
 misleading; a missing one would crash the cascade). Names must be part of
 the final archive_related. Do not use `hard_delete` for resources referenced
-elsewhere via foreign keys (e.g. `ash_borrow` used resources) — the database
+elsewhere via foreign keys (e.g. `ash_ownership` used resources) — the database
 will reject the delete.
 
-Relationships marked by `ash_borrow` are recognized on both sides:
+Relationships marked by `ash_ownership` are recognized on all three sides:
 `:__used_by__` has_many/has_one relationships are never treated as
 fully-contained children (excluded from `archive_related` automatically),
-and `:__uses__` belongs_to relationships are exempt from the
-reverse-relationship validation (non-owning references form no containment
-chain).
+and `:__uses__` / `:__ancestor__` belongs_to relationships are exempt from
+the reverse-relationship validation (neither forms a containment chain).
+
+A relationship carrying `:__cascade_skip__` is likewise never a
+fully-contained child. Extensions that generate several relationships over
+the same rows use it to nominate one of them as the cascade path, so the
+parent does not walk the same children once per view.
 
 ## Validation
 

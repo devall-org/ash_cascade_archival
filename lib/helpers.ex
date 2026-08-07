@@ -33,7 +33,7 @@ defmodule AshCascadeArchival.Helpers do
   def cascade_skip?(rel), do: Map.get(rel, :__cascade_skip__, false) == true
 
   @doc """
-  Returns true if the relationship is a `uses` edge (see `ash_borrow`):
+  Returns true if the relationship is a `uses` edge (see `ash_ownership`):
   a non-owning belongs_to that must not be treated as a containment chain.
   """
   def uses?(rel), do: Map.get(rel, :__uses__, false) == true

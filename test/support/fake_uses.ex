@@ -1,9 +1,9 @@
 defmodule AshCascadeArchival.Test.Support.FakeUses do
   @moduledoc false
-  # Minimal stand-in for ash_borrow's `uses` entity: compiles to a
+  # Minimal stand-in for ash_ownership's `uses` entity: compiles to a
   # BelongsTo carrying the `:__uses__` marker, so the integration between
   # the marker and this library's verifiers can be tested without a
-  # dependency on ash_borrow.
+  # dependency on ash_ownership.
 
   @fake_used_by %Spark.Dsl.Entity{
     name: :fake_used_by,
