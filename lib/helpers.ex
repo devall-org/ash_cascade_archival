@@ -28,6 +28,11 @@ defmodule AshCascadeArchival.Helpers do
   def uses?(rel), do: Map.get(rel, :__uses__, false) == true
 
   @doc """
+  Returns true if the relationship was declared with `ancestor` (see ash_ownership).
+  """
+  def ancestor?(rel), do: Map.get(rel, :__ancestor__, false) == true
+
+  @doc """
   Returns true if the child relationship points to the given module.
   Only applies to has_one and has_many relationships.
   """

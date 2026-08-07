@@ -9,15 +9,21 @@ defmodule AshCascadeArchival.Verifier do
   def verify(dsl_state) do
     child_module = dsl_state |> Verifier.get_persisted(:module)
 
-    # `uses` edges (see ash_borrow) are non-owning references, not
-    # containment chains: their targets never take the user down, so no
-    # reverse fully-contained relationship is required (nor possible — the
-    # reverse side is a `used_by`, which is excluded from containment).
+    # `uses` and `ancestor` edges (see ash_ownership) are not containment.
+    #
+    # A `uses` target never takes its user down, so no reverse fully-contained
+    # relationship is required (nor possible — the reverse side is a `used_by`,
+    # which is excluded from containment).
+    #
+    # An `ancestor` only carries a denormalized id: the record's real parent is
+    # another relationship, and the cascade reaches it through that parent. The
+    # ancestor declaring a reverse relationship would add a redundant shortcut
+    # over the whole subtree.
     belongs_to_rels =
       dsl_state
       |> Ash.Resource.Info.relationships()
       |> Enum.filter(fn
-        %BelongsTo{} = rel -> not Helpers.uses?(rel)
+        %BelongsTo{} = rel -> not Helpers.uses?(rel) and not Helpers.ancestor?(rel)
         %{} -> false
       end)
 
