@@ -97,7 +97,7 @@ defmodule AshCascadeArchival.Transformer do
   defp apply_ends(names, first, last) do
     validate_end_names!(first ++ last, names)
 
-    first ++ (names -- (first -- last)) ++ last
+    first ++ (names -- (first ++ last)) ++ last
   end
 
   defp validate_end_names!(named, names) do

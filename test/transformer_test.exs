@@ -119,6 +119,37 @@ defmodule AshCascadeArchival.TransformerTest do
     end
   end
 
+  describe "order_last option" do
+    test "moves the declared relationship to the end without duplication" do
+      defmodule PostWithOrderLast do
+        @moduledoc false
+        use Ash.Resource, domain: nil, extensions: [AshCascadeArchival.Resource]
+
+        cascade_archive do
+          order_last([:comments])
+        end
+
+        attributes do
+          uuid_primary_key :id
+        end
+
+        relationships do
+          has_many :comments, AshCascadeArchival.Test.Support.TestResources.Comment do
+            destination_attribute :post_id
+          end
+
+          has_many :post_tags, AshCascadeArchival.Test.Support.TestResources.PostTag do
+            destination_attribute :post_id
+          end
+        end
+      end
+
+      archive_related = AshArchival.Resource.Info.archive_archive_related!(PostWithOrderLast)
+
+      assert archive_related == [:post_tags, :comments]
+    end
+  end
+
   describe "used_by exclusion" do
     test "a has_many carrying the :__used_by__ marker is not fully contained" do
       plain = %Ash.Resource.Relationships.HasMany{
